@@ -1,0 +1,65 @@
+# Build outputs
+build/
+cmake-build-debug/
+bin/
+obj/
+*.o
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
+
+# IDE/Editor directories and files
+.vs/
+.settings/
+.project
+.cproject
+.mxproject
+*.launch
+*.swp
+*.swo
+*~
+
+# Debug configurations
+Debug/
+Release/
+
+# CubeMX generated files (keep the .ioc file but ignore generated code if needed)
+# Note: Uncomment below if you want to ignore generated code
+# Core/Src/main.c
+# Core/Src/stm32h7xx_it.c
+# Core/Src/system_stm32h7xx.c
+# Core/Inc/stm32h7xx_hal_conf.h
+
+# Eclipse CDT settings
+.cdtbuild
+.cdtproject
+.launch
+.settings/language.settings.xml
+
+# VS Code settings
+.vscode/
+
+# Doxygen output
+doc/
+html/
+latex/
+
+# Log files
+*.log
+
+# Backup files
+*.bak
+*.backup
+
+# Executable files
+*.exe
+*.out
+
+# FreeRTOS generated files (if any)
+*.trace
+
+# IDE / AI assistant metadata
+.claude/
+.idea/
