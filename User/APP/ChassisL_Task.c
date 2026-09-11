@@ -26,14 +26,15 @@
 /* Variable && Struct --------------------------------------------------------*/
 chassis_move_t chassis_move;
 chassis_mode_e chassis_mode;
-vmc_leg_t left_leg;
+vmc_leg_t left_vmc_leg;
+vmc_leg_t right_vmc_leg;
 const uint32_t chassis_time = 1;
 extern float mpc_out;
 
 /* Function Declaration ------------------------------------------------------*/
-static void chassisL_init(chassis_move_t * chassis_move_init, vmc_leg_t * vmc);
+static void chassis_init(chassis_move_t * chassis_move_init);
 void Chassis_Feedback_Update(chassis_move_t *chassis);
-static void chassisL_output_to_motor(chassis_move_t * chassis, vmc_leg_t * vmc);
+static void chassis_output_to_motor(chassis_move_t * chassis);
 void Chassis_Motor_Status_PeriodElapsedCallback(chassis_move_t *chassis);
 void chassis_motor_keep_alive(chassis_move_t *chassis);
 
@@ -54,7 +55,7 @@ void ChassisL_Task(void)
         osDelay(1);
     }
     // osDelay(5000);
-    chassisL_init(&chassis_move, &left_leg);
+    chassis_init(&chassis_move);
 
     while (1)
     {
@@ -62,7 +63,7 @@ void ChassisL_Task(void)
         Chassis_Feedback_Update(&chassis_move);
 
         //电机控制数据产出，髋电机数据发送
-        chassisL_output_to_motor(&chassis_move, &left_leg);
+        chassis_output_to_motor(&chassis_move);
 
         //电机状态检测函数
         Chassis_Motor_Status_PeriodElapsedCallback(&chassis_move);
@@ -83,7 +84,7 @@ void ChassisL_Task(void)
  * @param
  * @return
  */
-static void chassisL_init(chassis_move_t *chassis_move_init, vmc_leg_t *vmc)
+static void chassis_init(chassis_move_t *chassis_move_init)
 {
     //遥控器数据指针获取
     chassis_move_init->chassis_RC = get_remote_control_point();
@@ -150,7 +151,7 @@ void Chassis_Feedback_Update(chassis_move_t *chassis)
  * @param
  * @return
  */
-static void chassisL_output_to_motor(chassis_move_t *chassis, vmc_leg_t *vmc)
+static void chassis_output_to_motor(chassis_move_t *chassis)
 {
     static int mod = 0;
     mod++;
@@ -172,26 +173,13 @@ static void chassisL_output_to_motor(chassis_move_t *chassis, vmc_leg_t *vmc)
         chassis->Super_Cap_Tx.cap_flag = 1;
     }
 
-    // if (Host_communication.init_flag == 0 || robot_state.chassis_output == 0 || chassis_move.Motor_Wheel[0].CAN_Motor_Status == CAN_Motor_Status_DISABLE || chassis_move.Motor_Wheel[1].CAN_Motor_Status == CAN_Motor_Status_DISABLE)
-    // {
-    //     chassis->Motor_Joint[3].Control_Torque = 0.0f;
-    //     chassis->Motor_Joint[2].Control_Torque = 0.0f;
-    //     chassis->Motor_Joint[1].Control_Torque = 0.0f;
-    //     chassis->Motor_Joint[0].Control_Torque = 0.0f;
-    //
-    //     chassis->Motor_Wheel[0].Target_Current = 0.0f;
-    //     chassis->Motor_Wheel[1].Target_Current = 0.0f;
-    // }
-    // else
-    // {
-        chassis->Motor_Joint[3].Control_Torque = -Host_communication.Rx_data.torque[3] * 1.0;
-        chassis->Motor_Joint[2].Control_Torque = -Host_communication.Rx_data.torque[2] * 1.0;
-        chassis->Motor_Joint[1].Control_Torque = -Host_communication.Rx_data.torque[1] * 1.0;
-        chassis->Motor_Joint[0].Control_Torque = -Host_communication.Rx_data.torque[0] * 1.0;
+    chassis->Motor_Joint[3].Control_Torque = -Host_communication.Rx_data.torque[3] * 1.0;
+    chassis->Motor_Joint[2].Control_Torque = -Host_communication.Rx_data.torque[2] * 1.0;
+    chassis->Motor_Joint[1].Control_Torque = -Host_communication.Rx_data.torque[1] * 1.0;
+    chassis->Motor_Joint[0].Control_Torque = -Host_communication.Rx_data.torque[0] * 1.0;
 
-        chassis->Motor_Wheel[0].Target_Current = 4.0f * Host_communication.Rx_data.wheel_torque[0];
-        chassis->Motor_Wheel[1].Target_Current = 4.0f * Host_communication.Rx_data.wheel_torque[1];
-    //}
+    chassis->Motor_Wheel[0].Target_Current = 4.0f * Host_communication.Rx_data.wheel_torque[0];
+    chassis->Motor_Wheel[1].Target_Current = 4.0f * Host_communication.Rx_data.wheel_torque[1];
 
     if (Can_Comm.Can_Control_Data.Rx_Data.robot_control_status==No_Control)
     {
@@ -203,14 +191,6 @@ static void chassisL_output_to_motor(chassis_move_t *chassis, vmc_leg_t *vmc)
         chassis->Motor_Wheel[0].Target_Current = 0.0f;
         chassis->Motor_Wheel[1].Target_Current = 0.0f;
     }
-
-    // chassis->Motor_Joint[3].Control_Torque = 0.0f;
-    // chassis->Motor_Joint[2].Control_Torque = 0.0f;
-    // chassis->Motor_Joint[1].Control_Torque = 0.0f;
-    // chassis->Motor_Joint[0].Control_Torque = 0.0f;
-    //
-    // chassis->Motor_Wheel[0].Target_Current = 0.0f;
-    // chassis->Motor_Wheel[1].Target_Current = 0.0f;
 
     Motor_DM_Normal_TIM_Send_PeriodElapsedCallback(&chassis->Motor_Joint[0]);
     Motor_DM_Normal_TIM_Send_PeriodElapsedCallback(&chassis->Motor_Joint[1]);
