@@ -32,6 +32,25 @@ typedef enum {
     Motor_Status_HEAVY_STALL,
 } Motor_Status_t;
 
+typedef enum
+{
+    CHASSIS_ZERO_FORCE,                     // 底盘零力模式
+    CHASSIS_NO_MOVE,                        // 底盘保持不动
+    CHASSIS_INFANTRY_FOLLOW_GIMBAL_YAW,     // 底盘跟随云台偏航
+} chassis_mode_e;
+
+typedef enum
+{
+    NORMAL, // 底盘正常状态
+    OVER_TURN, // 底盘翻倒
+    OVER_TURNING, // 底盘正在翻身
+    READY_TO_JUMP, // 准备跳跃
+    GATHER_STRENGTH, // 跳跃蓄力
+    TAKE_OFF_TO_JUMP, // 起跳伸腿
+    LANDING_CUSHIONING, // 落地缓冲
+    ABOVE_GROUND, // 底盘离地
+} chassis_fsm_mode_e;
+
 typedef struct
 {
     const RC_ctrl_t *chassis_RC; //底盘使用的遥控器指针, the point to remote control

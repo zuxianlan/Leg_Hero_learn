@@ -14,12 +14,9 @@
 #include "fdcan.h"
 #include "CAN_receive.h"
 #include "Host_Comm_Task.h"
-#include "lqr_k_calc.h"
 #include "VMC&LQR_Calc.h"
-#include "lqr_k_calc.h"
 #include "motor_dji.h"
 #include "motor_dm.h"
-#include "gpio.h"
 #include "Can_Comm_Task.h"
 
 /* Define --------------------------------------------------------------------*/
@@ -28,22 +25,15 @@
 
 /* Variable && Struct --------------------------------------------------------*/
 chassis_move_t chassis_move;
+chassis_mode_e chassis_mode;
 vmc_leg_t left_leg;
 const uint32_t chassis_time = 1;
-float LQR_K_L[2][6] = {0};
 extern float mpc_out;
 
 /* Function Declaration ------------------------------------------------------*/
 static void chassisL_init(chassis_move_t * chassis_move_init, vmc_leg_t * vmc);
-
 void Chassis_Feedback_Update(chassis_move_t *chassis);
-
-static void chassisL_feedback_update(chassis_move_t * chassis, vmc_leg_t * vmc);
-
-static void chassisL_control_loop(chassis_move_t * chassis, vmc_leg_t * vmc);
-
 static void chassisL_output_to_motor(chassis_move_t * chassis, vmc_leg_t * vmc);
-
 void Chassis_Motor_Status_PeriodElapsedCallback(chassis_move_t *chassis);
 void chassis_motor_keep_alive(chassis_move_t *chassis);
 
