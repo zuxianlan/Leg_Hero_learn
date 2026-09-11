@@ -33,7 +33,9 @@ extern float mpc_out;
 
 /* Function Declaration ------------------------------------------------------*/
 static void chassis_init(chassis_move_t * chassis_move_init);
-void Chassis_Feedback_Update(chassis_move_t *chassis);
+static void chassis_set_control(chassis_move_t *chassis);
+void Chassis_Feedback_Update(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr);
+static void chassis_control_loop(chassis_move_t *chassis, vmc_leg_t *vmcr, vmc_leg_t *vmcl);
 static void chassis_output_to_motor(chassis_move_t * chassis);
 void Chassis_Motor_Status_PeriodElapsedCallback(chassis_move_t *chassis);
 void chassis_motor_keep_alive(chassis_move_t *chassis);
@@ -59,18 +61,18 @@ void ChassisL_Task(void)
 
     while (1)
     {
+        //目标设置
+        chassis_set_control(&chassis_move);
         //底盘数据更新
-        Chassis_Feedback_Update(&chassis_move);
-
+        Chassis_Feedback_Update(&chassis_move, &left_vmc_leg, &right_vmc_leg);
+        //PID计算
+        chassis_control_loop(&chassis_move, &left_vmc_leg, &right_vmc_leg);
         //电机控制数据产出，髋电机数据发送
         chassis_output_to_motor(&chassis_move);
-
         //电机状态检测函数
         Chassis_Motor_Status_PeriodElapsedCallback(&chassis_move);
-
         //超电数据添加到发送组
         CAP_AddTxPacket(&chassis_move.Super_Cap_Tx, cap);
-
         //轮电机，超电数据发送
         TIM_CAN_PeriodElapsedCallback();
 
@@ -114,6 +116,12 @@ static void chassis_init(chassis_move_t *chassis_move_init)
                     Motor_DJI_Power_Limit_Status_DISABLE, 20.0f);
     chassis_move_init->Motor_Wheel[1].Gearbox_Rate = 15.17f;
 
+    // 底盘 PID 初始化
+    PID_Init(&chassis_move_init->PID_legL, 50.0f, 10.0f, 20.0f, 0.0f, 10.0f, 150.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
+    PID_Init(&chassis_move_init->PID_legR, 50.0f, 10.0f, 20.0f, 0.0f, 10.0f, 150.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
+    PID_Init(&chassis_move_init->PID_roll, 5.0f, 0.0f, 1.0f, 0.0f, 0.0f, 90.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
+    PID_Init(&chassis_move_init->PID_tp, 70.0f, 0.0f, 0.0f, 0.0f, 0.0f, 5.0f, 0.01f, 0.0f, 0.0f, 0.0f,0.0f, PID_D_First_ENABLE);
+
     PID_Init(&chassis_move_init->PID_buffer, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 10.0f, 0.1f, 0.0f, 0.0f, 0.0f,0.0f, PID_D_First_DISABLE);
 
     Motor_DM_Normal_CAN_Send_Enable(&chassis_move_init->Motor_Joint[0]);
@@ -124,8 +132,21 @@ static void chassis_init(chassis_move_t *chassis_move_init)
 
 }
 
+/**
+ * @brief 设置底盘目标值
+ * @param
+ * @return
+ */
+static void chassis_set_control(chassis_move_t *chassis)
+{
+    if (chassis == NULL)  {return;}
+    // 设置 theta 误差目标
+    chassis->Target_Theta = 0.0f;
+
+}
+
 //反馈更新
-void Chassis_Feedback_Update(chassis_move_t *chassis)
+void Chassis_Feedback_Update(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr)
 {
     chassis->left_leg.phi1 = PI + chassis->Motor_Joint[1].Rx_Data.Now_Angle;
     chassis->left_leg.phi4 = chassis->Motor_Joint[0].Rx_Data.Now_Angle;
@@ -139,11 +160,46 @@ void Chassis_Feedback_Update(chassis_move_t *chassis)
 
     chassis->pitch = -chassis->chassis_INS_point->Pitch;
     chassis->d_pitch = -chassis->chassis_INS_point->Gyro[0];
+    chassis->theta_err = vmcl->theta - vmcr->theta;
 
     VMC_Calc_1(&chassis->left_leg, (float)chassis_time/1000.0f);
     VMC_Calc_1(&chassis->right_leg, (float)chassis_time/1000.0f);
 }
 
+
+/**
+ * @brief 根据底盘模式执行 PID 控制
+ * @param
+ * @return
+ */
+static void chassis_control_loop(chassis_move_t *chassis, vmc_leg_t *vmcr, vmc_leg_t *vmcl)
+{
+
+    // 设置左腿长度目标
+    chassis->PID_legL.Target += chassis->Target_Leg_l;
+    Math_Constrain(&chassis->PID_legL.Target, MIN_LEG_LENGTH, MAX_LEG_LENGTH);
+    chassis->PID_legL.Now = vmcl->L0;
+    PID_TIM_Adjust_PeriodElapsedCallback(&chassis->PID_legL);
+
+    // 设置右腿长度目标
+    chassis->PID_legR.Target += chassis->Target_Leg_r;
+    Math_Constrain(&chassis->PID_legR.Target, MIN_LEG_LENGTH, MAX_LEG_LENGTH);
+    chassis->PID_legR.Now = vmcr->L0;
+    PID_TIM_Adjust_PeriodElapsedCallback(&chassis->PID_legR);
+
+    // 设置横滚目标
+    chassis->PID_roll.Target = chassis->Target_Roll;
+    Math_Constrain(&chassis->PID_roll.Target, -PI/10.0f, PI/10.0f);
+    chassis->PID_roll.Now = chassis->chassis_INS_point->Roll;
+    //PID_TIM_Adjust_PeriodElapsedCallback(&chassis->PID_roll);
+
+    // 设置 theta 误差目标
+    chassis->PID_tp.Target = chassis->Target_Theta;
+    Math_Constrain(&chassis->PID_tp.Target, -PI/6.0f, PI/6.0f);
+    chassis->PID_tp.Now = chassis->theta_err;
+    //PID_TIM_Adjust_PeriodElapsedCallback(&chassis->PID_tp);
+
+}
 
 /**
  * @brief 输出到电机

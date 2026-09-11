@@ -21,7 +21,8 @@
 #include "VMC&LQR_Calc.h"
 
 /* Define --------------------------------------------------------------------*/
-
+#define MIN_LEG_LENGTH 0.15f
+#define MAX_LEG_LENGTH 0.28f
 /* Enum ----------------------------------------------------------------------*/
 
 /* Struct --------------------------------------------------------------------*/
@@ -82,6 +83,12 @@ typedef struct
     Motor_Status_t joint_motor_status[4];
     Motor_Status_t wheel_motor_status[2];
 
+    float Target_Leg_l;
+    float Target_Leg_r;
+    float Target_Roll;
+    float Target_Theta; //Ä¿±êÎó²î
+
+    float theta_err;// Á½ÍÈ¼Ð½ÇÎó²î
     float aaaa;
 } chassis_move_t;
 
