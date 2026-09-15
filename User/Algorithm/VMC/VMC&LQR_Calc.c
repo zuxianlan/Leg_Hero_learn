@@ -119,6 +119,23 @@ void VMC_Calc_2(vmc_leg_t *vmc)
 }
 
 /**
+ * @brief 由P矩阵通过计算得到4*10的K矩阵
+ * @param
+ * @return
+ */
+void Fitting_K_Calc(float (*fitting_k)[10], float (*p)[6], float L_l, float L_r)
+{
+    static int i = 0;
+    static int j = 0;
+    for(i=0;i<=3;i++)
+    {
+        for(j=0;j<=9;j++)
+        {
+            fitting_k[i][j] = p[i*10+j][0] + p[i*10+j][1]*L_l + p[i*10+j][2]*L_r + p[i*10+j][3]*(L_l*L_l) + p[i*10+j][4]*L_l*L_r + p[i*10+j][5]*(L_r*L_r);
+        }
+    }
+}
+/**
  * @brief 离地检测
  *
  * @param

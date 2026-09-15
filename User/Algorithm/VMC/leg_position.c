@@ -1,5 +1,5 @@
 /*
-* File: leg_position.c
+ * File: leg_position.c
  *
  * MATLAB Coder version            : 5.6
  * C/C++ source code generated on  : 07-Aug-2025 13:06:59

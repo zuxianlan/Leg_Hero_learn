@@ -59,6 +59,6 @@ void VMC_Calc_2(vmc_leg_t *vmc);
 uint8_t ground_detection(vmc_leg_t *vmc, const INS_t *ins);
 
 /* Function ------------------------------------------------------------------*/
-
+extern float P[40][6];
 
 #endif //VMC_LQR_CALC_H

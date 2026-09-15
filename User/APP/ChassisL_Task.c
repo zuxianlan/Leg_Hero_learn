@@ -41,7 +41,7 @@ void Chassis_Motor_Status_PeriodElapsedCallback(chassis_move_t *chassis);
 void chassis_motor_keep_alive(chassis_move_t *chassis);
 
 uint8_t cap[8] = {0};
-
+float Fitting_K[4][10] = {}; // 10 维 LQR 增益矩阵（4输入×10状态，由 P[40][6] 系数表按左右腿长实时重建）
 int a=0;
 /* Function ------------------------------------------------------------------*/
 /**
