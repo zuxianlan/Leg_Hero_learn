@@ -35,10 +35,12 @@ extern float mpc_out;
 static void chassis_init(chassis_move_t * chassis_move_init);
 static void chassis_set_control(chassis_move_t *chassis);
 void Chassis_Feedback_Update(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr);
-static void chassis_control_loop(chassis_move_t *chassis, vmc_leg_t *vmcr, vmc_leg_t *vmcl);
+static void chassis_control_loop(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr);
+static void chassis_lqr_calc_to_motor(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr);
 static void chassis_output_to_motor(chassis_move_t * chassis);
 void Chassis_Motor_Status_PeriodElapsedCallback(chassis_move_t *chassis);
 void chassis_motor_keep_alive(chassis_move_t *chassis);
+static float Max_Output(float num,float max);
 
 uint8_t cap[8] = {0};
 float Fitting_K[4][10] = {}; // 10 维 LQR 增益矩阵（4输入×10状态，由 P[40][6] 系数表按左右腿长实时重建）
@@ -67,11 +69,10 @@ void ChassisL_Task(void)
         Chassis_Feedback_Update(&chassis_move, &left_vmc_leg, &right_vmc_leg);
         //PID计算
         chassis_control_loop(&chassis_move, &left_vmc_leg, &right_vmc_leg);
-        //电机控制数据产出，髋电机数据发送
+
+        chassis_lqr_calc_to_motor(&chassis_move, &left_vmc_leg, &right_vmc_leg);
         chassis_output_to_motor(&chassis_move);
-        //电机状态检测函数
         Chassis_Motor_Status_PeriodElapsedCallback(&chassis_move);
-        //超电数据添加到发送组
         CAP_AddTxPacket(&chassis_move.Super_Cap_Tx, cap);
         //轮电机，超电数据发送
         TIM_CAN_PeriodElapsedCallback();
@@ -162,20 +163,20 @@ void Chassis_Feedback_Update(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t
     chassis->d_pitch = -chassis->chassis_INS_point->Gyro[0];
     chassis->theta_err = vmcl->theta - vmcr->theta;
 
+    VMC_Calc_1(&chassis->left_leg, (float)chassis_time/1000.0f);
+    VMC_Calc_1(&chassis->right_leg, (float)chassis_time/1000.0f);
+
     chassis->err[0] = chassis->X_filter - chassis->Target_X;
     chassis->err[1] = chassis->Velocity_filter - chassis->Target_Velocity;
     chassis->err[2] = 0;
     chassis->err[3] = chassis->chassis_INS_point->Gyro[2] - chassis->Target_Omega;
-    chassis->err[4] = vmcl->theta - chassis->Target_Theta;
+    chassis->err[4] = Max_Output((vmcl->theta - chassis->Target_Theta), 0.5f);
     chassis->err[5] = vmcl->d_theta - 0;
-    chassis->err[6] = vmcr->theta - chassis->Target_Theta;
+    chassis->err[6] = Max_Output((vmcr->theta - chassis->Target_Theta), 0.5f);
     chassis->err[7] = vmcr->d_theta - 0;
-    chassis->err[8] = chassis->pitch - 0;
+    chassis->err[8] = Max_Output((chassis->pitch - 0), 1.0f);
     chassis->err[9] = chassis->d_pitch - 0;
 
-
-    VMC_Calc_1(&chassis->left_leg, (float)chassis_time/1000.0f);
-    VMC_Calc_1(&chassis->right_leg, (float)chassis_time/1000.0f);
 }
 
 
@@ -184,7 +185,7 @@ void Chassis_Feedback_Update(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t
  * @param
  * @return
  */
-static void chassis_control_loop(chassis_move_t *chassis, vmc_leg_t *vmcr, vmc_leg_t *vmcl)
+static void chassis_control_loop(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr)
 {
 
     // 设置左腿长度目标
@@ -213,16 +214,33 @@ static void chassis_control_loop(chassis_move_t *chassis, vmc_leg_t *vmcr, vmc_l
 
 }
 
-static void chassis_lqr_calc_to_motor(chassis_move_t *chassis)
+/**
+ * @brief 计算T矩阵给电机
+ * @param
+ * @return
+ */
+static void chassis_lqr_calc_to_motor(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr)
 {
     for (int i = 0; i < 4; i++)
     {
-
+        chassis->T[i] = chassis->err[0] * Fitting_K[i][0]
+        + Max_Output(chassis->err[1] * Fitting_K[i][1], 16)
+        - Max_Output(chassis->err[2] * Fitting_K[i][2], 15.0f)
+        + chassis->err[3] * Fitting_K[i][3]
+        + chassis->err[4] * Fitting_K[i][4]
+        + chassis->err[5] * Fitting_K[i][5] * 0.94f
+        + chassis->err[6] * Fitting_K[i][6]
+        + chassis->err[7] * Fitting_K[i][7] * 0.94f
+        + chassis->err[8] * Fitting_K[i][8]
+        + chassis->err[9] * Fitting_K[i][9];
     }
+    chassis->T_wl = chassis->T[0];
+    chassis->T_wr = chassis->T[1];
+    vmcl->Tp = chassis->T[2];
+    vmcr->Tp = chassis->T[3];
 }
 /**
  * @brief 输出到电机
- *
  * @param
  * @return
  */
@@ -355,3 +373,9 @@ void Chassis_Motor_Status_PeriodElapsedCallback(chassis_move_t *chassis)
     chassis_wheel_motor_status_influence_output(chassis);
 }
 
+static float Max_Output(float num,float max)
+{
+    if(num>=max) return max;
+    else if(num<=-max) return -max;
+    else return num;
+}

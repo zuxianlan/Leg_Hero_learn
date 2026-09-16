@@ -56,7 +56,6 @@ typedef struct
 {
     const RC_ctrl_t *chassis_RC; //底盘使用的遥控器指针, the point to remote control
     const INS_t *chassis_INS_point;
-
     RC_ctrl_t Chassis_RC;
 
     cap_rx_data_t Super_Cap_Rx;
@@ -96,6 +95,10 @@ typedef struct
     float theta_err; // 两腿夹角误差
 
     float T[4]; //LQR_Calc 输出的四路力矩：T_wl(左轮) T_wr(右轮) T_bl(左髋) T_br(右髋)
+    float T_wl; //左轮电机力矩
+    float T_wr; //右轮电机力矩
+    float T_bl; //左髋关节力矩
+    float T_br; //右髋关节力矩
     float err[10]; // 10 维状态误差向量，顺序：X ? 偏航 偏航率 θ_L θ?_L θ_R θ?_R 机体俯仰 俯仰率
 } chassis_move_t;
 
