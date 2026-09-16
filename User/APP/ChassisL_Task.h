@@ -87,9 +87,16 @@ typedef struct
     float Target_Leg_r;
     float Target_Roll;
     float Target_Theta; //目标误差
+    float Target_X; //目标位移
+    float Target_Velocity; //目标速度
+    float Target_Omega; //目标偏航角速度
 
-    float theta_err;// 两腿夹角误差
-    float aaaa;
+    float Velocity_filter; // 滤波后的前进速度估计值（m/s）
+    float X_filter; // 滤波后的前进位移估计值（m）
+    float theta_err; // 两腿夹角误差
+
+    float T[4]; //LQR_Calc 输出的四路力矩：T_wl(左轮) T_wr(右轮) T_bl(左髋) T_br(右髋)
+    float err[10]; // 10 维状态误差向量，顺序：X ? 偏航 偏航率 θ_L θ?_L θ_R θ?_R 机体俯仰 俯仰率
 } chassis_move_t;
 
 /* Function Declaration ------------------------------------------------------*/

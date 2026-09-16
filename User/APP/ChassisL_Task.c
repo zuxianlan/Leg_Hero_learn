@@ -162,6 +162,18 @@ void Chassis_Feedback_Update(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t
     chassis->d_pitch = -chassis->chassis_INS_point->Gyro[0];
     chassis->theta_err = vmcl->theta - vmcr->theta;
 
+    chassis->err[0] = chassis->X_filter - chassis->Target_X;
+    chassis->err[1] = chassis->Velocity_filter - chassis->Target_Velocity;
+    chassis->err[2] = 0;
+    chassis->err[3] = chassis->chassis_INS_point->Gyro[2] - chassis->Target_Omega;
+    chassis->err[4] = vmcl->theta - chassis->Target_Theta;
+    chassis->err[5] = vmcl->d_theta - 0;
+    chassis->err[6] = vmcr->theta - chassis->Target_Theta;
+    chassis->err[7] = vmcr->d_theta - 0;
+    chassis->err[8] = chassis->pitch - 0;
+    chassis->err[9] = chassis->d_pitch - 0;
+
+
     VMC_Calc_1(&chassis->left_leg, (float)chassis_time/1000.0f);
     VMC_Calc_1(&chassis->right_leg, (float)chassis_time/1000.0f);
 }
@@ -201,6 +213,13 @@ static void chassis_control_loop(chassis_move_t *chassis, vmc_leg_t *vmcr, vmc_l
 
 }
 
+static void chassis_lqr_calc_to_motor(chassis_move_t *chassis)
+{
+    for (int i = 0; i < 4; i++)
+    {
+
+    }
+}
 /**
  * @brief 输出到电机
  *
