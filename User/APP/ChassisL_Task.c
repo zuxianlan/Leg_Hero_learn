@@ -18,6 +18,7 @@
 #include "motor_dji.h"
 #include "motor_dm.h"
 #include "Can_Comm_Task.h"
+#include "user_lib.h"
 
 /* Define --------------------------------------------------------------------*/
 
@@ -37,7 +38,7 @@ static void chassis_set_control(chassis_move_t *chassis);
 void Chassis_Feedback_Update(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr);
 static void chassis_control_loop(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr);
 static void chassis_lqr_calc_to_motor(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr);
-static void chassis_output_to_motor(chassis_move_t * chassis);
+static void chassis_output_to_motor(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr);
 void Chassis_Motor_Status_PeriodElapsedCallback(chassis_move_t *chassis);
 void chassis_motor_keep_alive(chassis_move_t *chassis);
 static float Max_Output(float num,float max);
@@ -71,7 +72,7 @@ void ChassisL_Task(void)
         chassis_control_loop(&chassis_move, &left_vmc_leg, &right_vmc_leg);
 
         chassis_lqr_calc_to_motor(&chassis_move, &left_vmc_leg, &right_vmc_leg);
-        chassis_output_to_motor(&chassis_move);
+        chassis_output_to_motor(&chassis_move, &left_vmc_leg, &right_vmc_leg);
         Chassis_Motor_Status_PeriodElapsedCallback(&chassis_move);
         CAP_AddTxPacket(&chassis_move.Super_Cap_Tx, cap);
         //轮电机，超电数据发送
@@ -122,7 +123,7 @@ static void chassis_init(chassis_move_t *chassis_move_init)
     PID_Init(&chassis_move_init->PID_legR, 50.0f, 10.0f, 20.0f, 0.0f, 10.0f, 150.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
     PID_Init(&chassis_move_init->PID_roll, 5.0f, 0.0f, 1.0f, 0.0f, 0.0f, 90.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
     PID_Init(&chassis_move_init->PID_tp, 70.0f, 0.0f, 0.0f, 0.0f, 0.0f, 5.0f, 0.01f, 0.0f, 0.0f, 0.0f,0.0f, PID_D_First_ENABLE);
-
+    PID_Init(&chassis_move_init->PID_tp_omega, 1.5f, 0.0f, 0.0f, 0.00f, 0.0f, 10.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
     PID_Init(&chassis_move_init->PID_buffer, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 10.0f, 0.1f, 0.0f, 0.0f, 0.0f,0.0f, PID_D_First_DISABLE);
 
     Motor_DM_Normal_CAN_Send_Enable(&chassis_move_init->Motor_Joint[0]);
@@ -159,12 +160,13 @@ void Chassis_Feedback_Update(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t
     chassis->right_leg.d_phi1 = -chassis->Motor_Joint[2].Rx_Data.Now_Omega;
     chassis->right_leg.d_phi4 = -chassis->Motor_Joint[3].Rx_Data.Now_Omega;
 
+    VMC_Calc_1(vmcl, (float)chassis_time/1000.0f);
+    VMC_Calc_1(vmcr, (float)chassis_time/1000.0f);
+
     chassis->pitch = -chassis->chassis_INS_point->Pitch;
     chassis->d_pitch = -chassis->chassis_INS_point->Gyro[0];
     chassis->theta_err = vmcl->theta - vmcr->theta;
-
-    VMC_Calc_1(&chassis->left_leg, (float)chassis_time/1000.0f);
-    VMC_Calc_1(&chassis->right_leg, (float)chassis_time/1000.0f);
+    chassis->d_theta_err = vmcl->d_theta - vmcr->d_theta;
 
     chassis->err[0] = chassis->X_filter - chassis->Target_X;
     chassis->err[1] = chassis->Velocity_filter - chassis->Target_Velocity;
@@ -210,8 +212,12 @@ static void chassis_control_loop(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_l
     chassis->PID_tp.Target = chassis->Target_Theta;
     Math_Constrain(&chassis->PID_tp.Target, -PI/6.0f, PI/6.0f);
     chassis->PID_tp.Now = chassis->theta_err;
-    //PID_TIM_Adjust_PeriodElapsedCallback(&chassis->PID_tp);
+    PID_TIM_Adjust_PeriodElapsedCallback(&chassis->PID_tp);
 
+    //设置 d_theta 误差目标
+    chassis->PID_tp_omega.Target = chassis->PID_tp.Out;
+    chassis->PID_tp_omega.Now = chassis->d_theta_err;
+    PID_TIM_Adjust_PeriodElapsedCallback(&chassis->PID_tp_omega);
 }
 
 /**
@@ -236,15 +242,18 @@ static void chassis_lqr_calc_to_motor(chassis_move_t *chassis, vmc_leg_t *vmcl, 
     }
     chassis->T_wl = chassis->T[0];
     chassis->T_wr = chassis->T[1];
-    vmcl->Tp = chassis->T[2];
-    vmcr->Tp = chassis->T[3];
+    vmcl->Tp = chassis->T[2] - chassis->PID_tp_omega.Out;
+    vmcr->Tp = chassis->T[3] + chassis->PID_tp_omega.Out;
+    //通过leg_convert得到髋关节每个电机应有的力矩
+    VMC_Calc_2(vmcl);
+    VMC_Calc_2(vmcr);
 }
 /**
  * @brief 输出到电机
  * @param
  * @return
  */
-static void chassis_output_to_motor(chassis_move_t *chassis)
+static void chassis_output_to_motor(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr)
 {
     static int mod = 0;
     mod++;
@@ -266,13 +275,19 @@ static void chassis_output_to_motor(chassis_move_t *chassis)
         chassis->Super_Cap_Tx.cap_flag = 1;
     }
 
-    chassis->Motor_Joint[3].Control_Torque = -Host_communication.Rx_data.torque[3] * 1.0;
-    chassis->Motor_Joint[2].Control_Torque = -Host_communication.Rx_data.torque[2] * 1.0;
-    chassis->Motor_Joint[1].Control_Torque = -Host_communication.Rx_data.torque[1] * 1.0;
-    chassis->Motor_Joint[0].Control_Torque = -Host_communication.Rx_data.torque[0] * 1.0;
+    // chassis->Motor_Joint[3].Control_Torque = -Host_communication.Rx_data.torque[3] * 1.0f;
+    // chassis->Motor_Joint[2].Control_Torque = -Host_communication.Rx_data.torque[2] * 1.0f;
+    // chassis->Motor_Joint[1].Control_Torque = -Host_communication.Rx_data.torque[1] * 1.0f;
+    // chassis->Motor_Joint[0].Control_Torque = -Host_communication.Rx_data.torque[0] * 1.0f;
+    chassis->Motor_Joint[3].Control_Torque = float_constrain(vmcr->torque_set[1] * 1.0f, -45.0f, 45.0f);
+    chassis->Motor_Joint[2].Control_Torque = float_constrain(vmcr->torque_set[0] * 1.0f, -45.0f, 45.0f);
+    chassis->Motor_Joint[1].Control_Torque = float_constrain(-vmcl->torque_set[1] * 1.0f, -45.0f, 45.0f);
+    chassis->Motor_Joint[0].Control_Torque = float_constrain(-vmcl->torque_set[0] * 1.0f, -45.0f, 45.0f);
 
-    chassis->Motor_Wheel[0].Target_Current = 4.0f * Host_communication.Rx_data.wheel_torque[0];
-    chassis->Motor_Wheel[1].Target_Current = 4.0f * Host_communication.Rx_data.wheel_torque[1];
+    // chassis->Motor_Wheel[0].Target_Current = 4.0f * Host_communication.Rx_data.wheel_torque[0];
+    // chassis->Motor_Wheel[1].Target_Current = 4.0f * Host_communication.Rx_data.wheel_torque[1];
+    chassis->Motor_Wheel[0].Target_Current = float_constrain(4.0f * chassis->T_wl, -4.0f, 4.0f);
+    chassis->Motor_Wheel[1].Target_Current = float_constrain(4.0f * chassis->T_wr, -4.0f, 4.0f);
 
     if (Can_Comm.Can_Control_Data.Rx_Data.robot_control_status==No_Control)
     {

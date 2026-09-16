@@ -68,13 +68,14 @@ typedef struct
     float d_pitch;
 
     PID_control PID_buffer; // 左腿变腿长pid
-
     PID_control PID_legL; // 左腿变腿长pid
     PID_control PID_legR; // 右腿变腿长pid
     PID_control PID_yaw_angle; // 偏航角pid
     PID_control PID_yaw_omega; // 偏航角pid
     PID_control PID_roll; // 横滚角pid
     PID_control PID_tp; // 防劈叉pid
+    PID_control PID_tp_omega; // 防劈叉pid
+
     Motor_DM_Normal Motor_Joint[4];
     Motor_C620 Motor_Wheel[2];
     Motor_DM_Normal Motor_Yaw;
@@ -93,6 +94,7 @@ typedef struct
     float Velocity_filter; // 滤波后的前进速度估计值（m/s）
     float X_filter; // 滤波后的前进位移估计值（m）
     float theta_err; // 两腿夹角误差
+    float d_theta_err;
 
     float T[4]; //LQR_Calc 输出的四路力矩：T_wl(左轮) T_wr(右轮) T_bl(左髋) T_br(右髋)
     float T_wl; //左轮电机力矩
