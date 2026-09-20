@@ -79,6 +79,7 @@ include_directories(User/Algorithm/EKF
         User/Algorithm/Filter
         User/Algorithm/MPC
         User/Algorithm/KalmanCpp
+        User/Algorithm/KF
         User/Devices/Referee
         User/Devices/Referee/crc8_crc16
         User/Devices/SuperCap
