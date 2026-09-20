@@ -18,6 +18,7 @@
 #include "motor_dji.h"
 #include "motor_dm.h"
 #include "Can_Comm_Task.h"
+#include "chassis_kalman.h"
 #include "user_lib.h"
 
 /* Define --------------------------------------------------------------------*/
@@ -131,6 +132,7 @@ static void chassis_init(chassis_move_t *chassis_move_init)
     Motor_DM_Normal_CAN_Send_Enable(&chassis_move_init->Motor_Joint[2]);
     Motor_DM_Normal_CAN_Send_Enable(&chassis_move_init->Motor_Joint[3]);
 
+    chassis_kalman_init(&chassis_kalman);
 
 }
 
@@ -163,8 +165,8 @@ void Chassis_Feedback_Update(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t
     VMC_Calc_1(vmcl, (float)chassis_time/1000.0f);
     VMC_Calc_1(vmcr, (float)chassis_time/1000.0f);
 
-    chassis->pitch = -chassis->chassis_INS_point->Pitch;
-    chassis->d_pitch = -chassis->chassis_INS_point->Gyro[0];
+    chassis->pitch = chassis->chassis_INS_point->Pitch;
+    chassis->d_pitch = chassis->chassis_INS_point->Gyro[0];
     chassis->theta_err = vmcl->theta - vmcr->theta;
     chassis->d_theta_err = vmcl->d_theta - vmcr->d_theta;
     chassis->Omega_l = chassis->Motor_Wheel[0].Rx_Data.Now_Omega - chassis->d_pitch + vmcl->d_theta;
@@ -172,6 +174,9 @@ void Chassis_Feedback_Update(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t
     chassis->Speed_l = 0.06f * chassis->Omega_l + vmcl->L0 * vmcl->d_theta * arm_cos_f32(vmcl->theta) + vmcl->d_L0 * arm_sin_f32(vmcl->theta);
     chassis->Speed_r = 0.06f * chassis->Omega_r + vmcr->L0 * vmcr->d_theta * arm_cos_f32(vmcr->theta) + vmcr->d_L0 * arm_sin_f32(vmcr->theta);
     chassis->Average_Speed = -(chassis->Speed_l - chassis->Speed_r) / 2.0f;
+    //¸üÐÂ¿¨¶ûÂü
+    chassis_kalman_update(&chassis_kalman);
+    chassis->X_filter += chassis->Velocity_filter * (float)chassis_time/1000.0f;
 
     chassis->err[0] = chassis->X_filter - chassis->Target_X;
     chassis->err[1] = chassis->Velocity_filter - chassis->Target_Velocity;

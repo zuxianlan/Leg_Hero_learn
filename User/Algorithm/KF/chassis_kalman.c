@@ -1,11 +1,12 @@
 #include "chassis_kalman.h"
 #include "ChassisL_Task.h"
 
+chassis_kalman_t chassis_kalman;
 /**
   * @brief  底盘速度卡尔曼滤波器初始化
   * @param  kf 滤波器实例
   */
-void chassis_kalman_init(chassis_Kalman_t *kf)
+void chassis_kalman_init(chassis_kalman_t *kf)
 {
     kf->x_hat[0]   = 0.0f;
     kf->x_hat[1]   = 0.0f;
@@ -49,7 +50,7 @@ void chassis_kalman_init(chassis_Kalman_t *kf)
   * @brief  底盘速度卡尔曼滤波器一拍更新
   * @param  kf 滤波器实例
   */
-void chassis_kalman_update(chassis_Kalman_t *kf)
+void chassis_kalman_update(chassis_kalman_t *kf)
 {
     /* ---------- 局部临时量：对应卡尔曼滤波公式中的中间矩阵 ---------- */
     float FPT[2][2];        /* F·P            （步骤2 临时）→ 复用为 H·P_p?（步骤3 临时） */

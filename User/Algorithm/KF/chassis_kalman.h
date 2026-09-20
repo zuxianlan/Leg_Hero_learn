@@ -21,8 +21,11 @@ typedef struct
     float R[2][2];      // 测量噪声协方差
     float z[2];         // 测量向量
     float StateMinVariance[2];           // 协方差对角元下界，防止过度收敛
-} chassis_Kalman_t;
+} chassis_kalman_t;
 
+extern void chassis_kalman_init(chassis_kalman_t *kf);
+extern void chassis_kalman_update(chassis_kalman_t *kf);
+extern chassis_kalman_t chassis_kalman;
 #define CHASSIS_KF_DT  0.001f       // 控制周期 s，与 osDelay(1) 对应
 #define MIN_VARIANCE 0.03f
 #endif //CTRLBOARD_H7_IMU_KALMAN_FILTER_H
