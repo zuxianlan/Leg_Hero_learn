@@ -167,6 +167,11 @@ void Chassis_Feedback_Update(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t
     chassis->d_pitch = -chassis->chassis_INS_point->Gyro[0];
     chassis->theta_err = vmcl->theta - vmcr->theta;
     chassis->d_theta_err = vmcl->d_theta - vmcr->d_theta;
+    chassis->Omega_l = chassis->Motor_Wheel[0].Rx_Data.Now_Omega - chassis->d_pitch + vmcl->d_theta;
+    chassis->Omega_r = chassis->Motor_Wheel[1].Rx_Data.Now_Omega - chassis->d_pitch + vmcr->d_theta;
+    chassis->Speed_l = 0.06f * chassis->Omega_l + vmcl->L0 * vmcl->d_theta * arm_cos_f32(vmcl->theta) + vmcl->d_L0 * arm_sin_f32(vmcl->theta);
+    chassis->Speed_r = 0.06f * chassis->Omega_r + vmcr->L0 * vmcr->d_theta * arm_cos_f32(vmcr->theta) + vmcr->d_L0 * arm_sin_f32(vmcr->theta);
+    chassis->Average_Speed = -(chassis->Speed_l - chassis->Speed_r) / 2.0f;
 
     chassis->err[0] = chassis->X_filter - chassis->Target_X;
     chassis->err[1] = chassis->Velocity_filter - chassis->Target_Velocity;

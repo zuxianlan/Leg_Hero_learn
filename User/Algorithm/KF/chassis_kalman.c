@@ -5,7 +5,7 @@
   * @brief  µ×ÅÌËÙ¶È¿¨¶ûÂüÂË²¨Æ÷³õÊ¼»¯
   * @param  kf ÂË²¨Æ÷ÊµÀı
   */
-void Chassis_Kalman_Init(chassis_Kalman_t *kf)
+void chassis_kalman_init(chassis_Kalman_t *kf)
 {
     kf->x_hat[0]   = 0.0f;
     kf->x_hat[1]   = 0.0f;
@@ -43,4 +43,11 @@ void Chassis_Kalman_Init(chassis_Kalman_t *kf)
     kf->K[0][0] = 0.0f;  kf->K[0][1] = 0.0f;
     kf->K[1][0] = 0.0f;  kf->K[1][1] = 0.0f;
 
+}
+
+void chassis_kalman_update(chassis_Kalman_t *kf)
+{
+    kf->z[0] = chassis_move.Average_Speed;
+    kf->z[1] = chassis_move.chassis_INS_point->MotionAccel_n[1];
+    chassis_move.Velocity_filter = kf->x_hat[0];
 }

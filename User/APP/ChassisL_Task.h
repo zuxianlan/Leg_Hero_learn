@@ -91,6 +91,11 @@ typedef struct
     float Target_Velocity; //目标速度
     float Target_Omega; //目标偏航角速度
 
+    float Omega_l;
+    float Omega_r;
+    float Speed_l;
+    float Speed_r;
+    float Average_Speed;
     float Velocity_filter; // 滤波后的前进速度估计值（m/s）
     float X_filter; // 滤波后的前进位移估计值（m）
     float theta_err; // 两腿夹角误差
