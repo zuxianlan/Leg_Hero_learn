@@ -146,15 +146,17 @@ static void chassis_init(chassis_move_t *chassis_move_init)
 static void chassis_mode_set(chassis_move_t *chassis)
 {
     if (chassis == NULL) {return;}
-    if (switch_is_mid(chassis->chassis_RC->RC.sw[3])&&
-            switch_is_down(chassis->chassis_RC->RC.sw[1])&&
-            switch_is_up(chassis->chassis_RC->RC.sw[4]))
-    {
-        chassis_mode = CHASSIS_INFANTRY_FOLLOW_GIMBAL_YAW;
-    }
-    else
+    if (switch_is_up(chassis->Chassis_RC.RC.sw[3]))
     {
         chassis_mode = CHASSIS_ZERO_FORCE;
+    }
+    else if (switch_is_mid(chassis->Chassis_RC.RC.sw[3]) && switch_is_up(chassis->Chassis_RC.RC.sw[1]))
+    {
+        chassis_mode = CHASSIS_CHECK_IN;
+    }
+    else if (switch_is_mid(chassis->Chassis_RC.RC.sw[3]) && switch_is_down(chassis->Chassis_RC.RC.sw[1]))
+    {
+        chassis_mode = CHASSIS_INFANTRY_FOLLOW_GIMBAL_YAW;
     }
 
 }
@@ -279,7 +281,7 @@ static void chassis_control_loop(chassis_move_t *chassis)
     chassis->PID_roll.Target = chassis->Target_Roll;
     Math_Constrain(&chassis->PID_roll.Target, -PI/10.0f, PI/10.0f);
     chassis->PID_roll.Now = chassis->chassis_INS_point->Roll;
-    //PID_TIM_Adjust_PeriodElapsedCallback(&chassis->PID_roll);
+    PID_TIM_Adjust_PeriodElapsedCallback(&chassis->PID_roll);
 
     // ÉèÖÃ theta Îó²îÄ¿±ê
     chassis->PID_tp.Target = chassis->Target_Theta;

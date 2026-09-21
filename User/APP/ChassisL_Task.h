@@ -40,7 +40,7 @@ typedef enum {
 typedef enum
 {
     CHASSIS_ZERO_FORCE,                     // 底盘零力模式
-    CHASSIS_NO_MOVE,                        // 底盘保持不动
+    CHASSIS_CHECK_IN,                       // 检录模式
     CHASSIS_INFANTRY_FOLLOW_GIMBAL_YAW,     // 底盘跟随云台偏航
 } chassis_mode_e;
 
