@@ -201,8 +201,6 @@ static void chassis_set_control(chassis_move_t *chassis)
         chassis_move.Target_Leg_l = vz_channel * RC_to_Chassis_Leg_Gain;
         chassis_move.Target_Leg_r = vz_channel * RC_to_Chassis_Leg_Gain;
 
-        chassis->M = 180.0f;
-        chassis_move.F_mc = chassis->Velocity_filter * chassis->chassis_INS_point->Gyro[2] * 28.0f;
 
     }
 
@@ -236,6 +234,12 @@ void Chassis_Feedback_Update(chassis_move_t *chassis)
     //¸üÐÂ¿¨¶ûÂü
     chassis_kalman_update(&chassis_kalman);
     chassis->X_filter += chassis->Velocity_filter * (float)chassis_time/1000.0f;
+
+    chassis->M = 180.0f;
+    chassis_move.F_mc = chassis->Velocity_filter * chassis->chassis_INS_point->Gyro[2] * 28.0f;
+    Math_Constrain(&chassis->F_mc, 0.0f, 100.0f);
+    chassis->spring_force_l = 100.0f - 10.0f*(1.0f - (chassis->left_leg.L0-0.1f)/0.28f);
+    chassis->spring_force_r = 100.0f - 10.0f*(1.0f - (chassis->right_leg.L0-0.1f)/0.28f);
 
     chassis->err[0] = chassis->X_filter - chassis->Target_X;
     chassis->err[1] = chassis->Velocity_filter - chassis->Target_Velocity;
