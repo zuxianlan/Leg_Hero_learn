@@ -122,6 +122,7 @@ static void chassis_init(chassis_move_t *chassis_move_init)
     // 底盘 PID 初始化
     PID_Init(&chassis_move_init->PID_legL, 50.0f, 10.0f, 20.0f, 0.0f, 10.0f, 150.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
     PID_Init(&chassis_move_init->PID_legR, 50.0f, 10.0f, 20.0f, 0.0f, 10.0f, 150.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
+    PID_Init(&chassis_move_init->PID_follow_yaw, 10.0f, 0.1f, 0.01f, 0.00f, 0.3f, 4.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_DISABLE);
     PID_Init(&chassis_move_init->PID_roll, 5.0f, 0.0f, 1.0f, 0.0f, 0.0f, 90.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
     PID_Init(&chassis_move_init->PID_tp, 70.0f, 0.0f, 0.0f, 0.0f, 0.0f, 5.0f, 0.01f, 0.0f, 0.0f, 0.0f,0.0f, PID_D_First_ENABLE);
     PID_Init(&chassis_move_init->PID_tp_omega, 1.5f, 0.0f, 0.0f, 0.00f, 0.0f, 10.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
@@ -193,6 +194,8 @@ static void chassis_set_control(chassis_move_t *chassis)
 
         // 设置速度
         chassis_move.Target_Velocity = vx_channel * MAX_Velocity;
+        // 设置偏航角速度
+        chassis_move.Target_Omega = -chassis_move.PID_follow_yaw.Out;
         // 设置偏航目标
         //chassis_move.Target_Yaw = vy_channel;
         // 设置横滚目标
@@ -264,7 +267,6 @@ void Chassis_Feedback_Update(chassis_move_t *chassis)
  */
 static void chassis_control_loop(chassis_move_t *chassis)
 {
-
     // 设置左腿长度目标
     chassis->PID_legL.Target += chassis->Target_Leg_l;
     Math_Constrain(&chassis->PID_legL.Target, MIN_LEG_LENGTH, MAX_LEG_LENGTH);
@@ -276,6 +278,11 @@ static void chassis_control_loop(chassis_move_t *chassis)
     Math_Constrain(&chassis->PID_legR.Target, MIN_LEG_LENGTH, MAX_LEG_LENGTH);
     chassis->PID_legR.Now = chassis->right_leg.L0;
     PID_TIM_Adjust_PeriodElapsedCallback(&chassis->PID_legR);
+
+    // 设置yaw目标
+    chassis->PID_follow_yaw.Target = chassis->follow_yaw_angle;
+    chassis->PID_follow_yaw.Now = chassis->Motor_Yaw.Rx_Data.Now_Angle;
+    PID_TIM_Adjust_PeriodElapsedCallback(&chassis->PID_follow_yaw);
 
     // 设置横滚目标
     chassis->PID_roll.Target = chassis->Target_Roll;

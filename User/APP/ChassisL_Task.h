@@ -74,8 +74,7 @@ typedef struct
     PID_control PID_buffer; // 左腿变腿长pid
     PID_control PID_legL; // 左腿变腿长pid
     PID_control PID_legR; // 右腿变腿长pid
-    PID_control PID_yaw_angle; // 偏航角pid
-    PID_control PID_yaw_omega; // 偏航角pid
+    PID_control PID_follow_yaw;
     PID_control PID_roll; // 横滚角pid
     PID_control PID_tp; // 防劈叉pid
     PID_control PID_tp_omega; // 防劈叉pid
@@ -94,6 +93,7 @@ typedef struct
     float Target_X; //目标位移
     float Target_Velocity; //目标速度
     float Target_Omega; //目标偏航角速度
+    float follow_yaw_angle;
 
     float Omega_l;
     float Omega_r;
