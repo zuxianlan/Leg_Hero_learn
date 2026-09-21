@@ -23,6 +23,10 @@
 /* Define --------------------------------------------------------------------*/
 #define MIN_LEG_LENGTH 0.15f
 #define MAX_LEG_LENGTH 0.28f
+#define RC_to_Chassis_Leg_Gain 0.0005f
+#define DR16_Rocker_Dead_Zone 0.04f
+// 最大速度
+#define MAX_Velocity 1.0f
 /* Enum ----------------------------------------------------------------------*/
 
 /* Struct --------------------------------------------------------------------*/
@@ -100,6 +104,10 @@ typedef struct
     float X_filter; // 滤波后的前进位移估计值（m）
     float theta_err; // 两腿夹角误差
     float d_theta_err;
+    float spring_force_l; //左腿弹簧补偿力
+    float spring_force_r; //右腿弹簧补偿力
+    float M; // 重力补偿用等效质量系数（控制中按模式改写，如行驶模式置 180）
+    float F_mc; // 转弯离心力补偿前馈（≈ v·ω_yaw·28，截断 0~100 N）
 
     float T[4]; //LQR_Calc 输出的四路力矩：T_wl(左轮) T_wr(右轮) T_bl(左髋) T_br(右髋)
     float T_wl; //左轮电机力矩

@@ -28,18 +28,17 @@
 /* Variable && Struct --------------------------------------------------------*/
 chassis_move_t chassis_move;
 chassis_mode_e chassis_mode;
-vmc_leg_t left_vmc_leg;
-vmc_leg_t right_vmc_leg;
 const uint32_t chassis_time = 1;
 extern float mpc_out;
 
 /* Function Declaration ------------------------------------------------------*/
 static void chassis_init(chassis_move_t * chassis_move_init);
+static void chassis_mode_set(chassis_move_t *chassis);
 static void chassis_set_control(chassis_move_t *chassis);
-void Chassis_Feedback_Update(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr);
-static void chassis_control_loop(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr);
-static void chassis_lqr_calc_to_motor(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr);
-static void chassis_output_to_motor(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr);
+void Chassis_Feedback_Update(chassis_move_t *chassis);
+static void chassis_control_loop(chassis_move_t *chassis);
+static void chassis_lqr_calc_to_motor(chassis_move_t *chassis);
+static void chassis_output_to_motor(chassis_move_t *chassis);
 void Chassis_Motor_Status_PeriodElapsedCallback(chassis_move_t *chassis);
 void chassis_motor_keep_alive(chassis_move_t *chassis);
 static float Max_Output(float num,float max);
@@ -66,14 +65,15 @@ void ChassisL_Task(void)
     while (1)
     {
         //目标设置
+        chassis_mode_set(&chassis_move);
         chassis_set_control(&chassis_move);
         //底盘数据更新
-        Chassis_Feedback_Update(&chassis_move, &left_vmc_leg, &right_vmc_leg);
+        Chassis_Feedback_Update(&chassis_move);
         //PID计算
-        chassis_control_loop(&chassis_move, &left_vmc_leg, &right_vmc_leg);
+        chassis_control_loop(&chassis_move);
 
-        chassis_lqr_calc_to_motor(&chassis_move, &left_vmc_leg, &right_vmc_leg);
-        chassis_output_to_motor(&chassis_move, &left_vmc_leg, &right_vmc_leg);
+        chassis_lqr_calc_to_motor(&chassis_move);
+        chassis_output_to_motor(&chassis_move);
         Chassis_Motor_Status_PeriodElapsedCallback(&chassis_move);
         CAP_AddTxPacket(&chassis_move.Super_Cap_Tx, cap);
         //轮电机，超电数据发送
@@ -132,7 +132,30 @@ static void chassis_init(chassis_move_t *chassis_move_init)
     Motor_DM_Normal_CAN_Send_Enable(&chassis_move_init->Motor_Joint[2]);
     Motor_DM_Normal_CAN_Send_Enable(&chassis_move_init->Motor_Joint[3]);
 
+    //底盘卡尔曼滤波初始化
     chassis_kalman_init(&chassis_kalman);
+
+}
+
+/**
+ * @brief 选择底盘模式
+ *
+ * @param chassis 底盘全局数据指针
+ * @return
+ */
+static void chassis_mode_set(chassis_move_t *chassis)
+{
+    if (chassis == NULL) {return;}
+    if (switch_is_mid(chassis->chassis_RC->RC.sw[3])&&
+            switch_is_down(chassis->chassis_RC->RC.sw[1])&&
+            switch_is_up(chassis->chassis_RC->RC.sw[4]))
+    {
+        chassis_mode = CHASSIS_INFANTRY_FOLLOW_GIMBAL_YAW;
+    }
+    else
+    {
+        chassis_mode = CHASSIS_ZERO_FORCE;
+    }
 
 }
 
@@ -144,13 +167,49 @@ static void chassis_init(chassis_move_t *chassis_move_init)
 static void chassis_set_control(chassis_move_t *chassis)
 {
     if (chassis == NULL)  {return;}
-    // 设置 theta 误差目标
-    chassis->Target_Theta = 0.0f;
+    if (chassis_mode == CHASSIS_ZERO_FORCE)
+    {
+        //清除pid
+        chassis->Target_X = chassis->X_filter;
+        PID_Clear_Out(&chassis->PID_roll);
+        PID_Clear_Out(&chassis->PID_tp);
+        PID_Clear_Out(&chassis->PID_tp_omega);
+        PID_Clear_Out(&chassis->PID_legL);
+        PID_Clear_Out(&chassis->PID_legR);
+
+    }
+    else if (chassis_mode == CHASSIS_INFANTRY_FOLLOW_GIMBAL_YAW)
+    {
+        float vx_channel = 0, vy_channel = 0, vz_channel = 0;
+        vx_channel = chassis->chassis_RC->RC.ch[3];
+        vy_channel = chassis->chassis_RC->RC.ch[4];
+        vz_channel = chassis->chassis_RC->RC.ch[2];
+        // 遥控器摇杆可能存在偏差，死区范围内的输入置零
+        vx_channel = Float_Math_Abs(vx_channel) > DR16_Rocker_Dead_Zone ? vx_channel : 0.0f;
+        vy_channel = Float_Math_Abs(vy_channel) > DR16_Rocker_Dead_Zone ? vy_channel : 0.0f;
+        vz_channel = Float_Math_Abs(vz_channel) > DR16_Rocker_Dead_Zone ? vz_channel : 0.0f;
+
+        // 设置速度
+        chassis_move.Target_Velocity = vx_channel * MAX_Velocity;
+        // 设置偏航目标
+        //chassis_move.Target_Yaw = vy_channel;
+        // 设置横滚目标
+        chassis_move.Target_Roll = 0.0f;
+        // 设置 theta 误差目标
+        chassis_move.Target_Theta = 0.0f;
+
+        chassis_move.Target_Leg_l = vz_channel * RC_to_Chassis_Leg_Gain;
+        chassis_move.Target_Leg_r = vz_channel * RC_to_Chassis_Leg_Gain;
+
+        chassis->M = 180.0f;
+        chassis_move.F_mc = chassis->Velocity_filter * chassis->chassis_INS_point->Gyro[2] * 28.0f;
+
+    }
 
 }
 
 //反馈更新
-void Chassis_Feedback_Update(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr)
+void Chassis_Feedback_Update(chassis_move_t *chassis)
 {
     chassis->left_leg.phi1 = PI + chassis->Motor_Joint[1].Rx_Data.Now_Angle;
     chassis->left_leg.phi4 = chassis->Motor_Joint[0].Rx_Data.Now_Angle;
@@ -162,17 +221,17 @@ void Chassis_Feedback_Update(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t
     chassis->right_leg.d_phi1 = -chassis->Motor_Joint[2].Rx_Data.Now_Omega;
     chassis->right_leg.d_phi4 = -chassis->Motor_Joint[3].Rx_Data.Now_Omega;
 
-    VMC_Calc_1(vmcl, (float)chassis_time/1000.0f);
-    VMC_Calc_1(vmcr, (float)chassis_time/1000.0f);
+    VMC_Calc_1(&chassis->left_leg, (float)chassis_time/1000.0f);
+    VMC_Calc_1(&chassis->right_leg, (float)chassis_time/1000.0f);
 
     chassis->pitch = chassis->chassis_INS_point->Pitch;
     chassis->d_pitch = chassis->chassis_INS_point->Gyro[0];
-    chassis->theta_err = vmcl->theta - vmcr->theta;
-    chassis->d_theta_err = vmcl->d_theta - vmcr->d_theta;
-    chassis->Omega_l = chassis->Motor_Wheel[0].Rx_Data.Now_Omega - chassis->d_pitch + vmcl->d_theta;
-    chassis->Omega_r = chassis->Motor_Wheel[1].Rx_Data.Now_Omega - chassis->d_pitch + vmcr->d_theta;
-    chassis->Speed_l = 0.06f * chassis->Omega_l + vmcl->L0 * vmcl->d_theta * arm_cos_f32(vmcl->theta) + vmcl->d_L0 * arm_sin_f32(vmcl->theta);
-    chassis->Speed_r = 0.06f * chassis->Omega_r + vmcr->L0 * vmcr->d_theta * arm_cos_f32(vmcr->theta) + vmcr->d_L0 * arm_sin_f32(vmcr->theta);
+    chassis->theta_err = chassis->left_leg.theta - chassis->right_leg.theta;
+    chassis->d_theta_err = chassis->left_leg.d_theta - chassis->right_leg.d_theta;
+    chassis->Omega_l = chassis->Motor_Wheel[0].Rx_Data.Now_Omega - chassis->d_pitch + chassis->left_leg.d_theta;
+    chassis->Omega_r = chassis->Motor_Wheel[1].Rx_Data.Now_Omega - chassis->d_pitch + chassis->right_leg.d_theta;
+    chassis->Speed_l = 0.06f * chassis->Omega_l + chassis->left_leg.L0 * chassis->left_leg.d_theta * arm_cos_f32(chassis->left_leg.theta) + chassis->left_leg.d_L0 * arm_sin_f32(chassis->left_leg.theta);
+    chassis->Speed_r = 0.06f * chassis->Omega_r + chassis->right_leg.L0 * chassis->right_leg.d_theta * arm_cos_f32(chassis->right_leg.theta) + chassis->right_leg.d_L0 * arm_sin_f32(chassis->right_leg.theta);
     chassis->Average_Speed = -(chassis->Speed_l - chassis->Speed_r) / 2.0f;
     //更新卡尔曼
     chassis_kalman_update(&chassis_kalman);
@@ -182,10 +241,10 @@ void Chassis_Feedback_Update(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t
     chassis->err[1] = chassis->Velocity_filter - chassis->Target_Velocity;
     chassis->err[2] = 0;
     chassis->err[3] = chassis->chassis_INS_point->Gyro[2] - chassis->Target_Omega;
-    chassis->err[4] = Max_Output((vmcl->theta - chassis->Target_Theta), 0.5f);
-    chassis->err[5] = vmcl->d_theta - 0;
-    chassis->err[6] = Max_Output((vmcr->theta - chassis->Target_Theta), 0.5f);
-    chassis->err[7] = vmcr->d_theta - 0;
+    chassis->err[4] = Max_Output((chassis->left_leg.theta - chassis->Target_Theta), 0.5f);
+    chassis->err[5] = chassis->left_leg.d_theta - 0;
+    chassis->err[6] = Max_Output((chassis->right_leg.theta - chassis->Target_Theta), 0.5f);
+    chassis->err[7] = chassis->right_leg.d_theta - 0;
     chassis->err[8] = Max_Output((chassis->pitch - 0), 1.0f);
     chassis->err[9] = chassis->d_pitch - 0;
 
@@ -197,19 +256,19 @@ void Chassis_Feedback_Update(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t
  * @param
  * @return
  */
-static void chassis_control_loop(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr)
+static void chassis_control_loop(chassis_move_t *chassis)
 {
 
     // 设置左腿长度目标
     chassis->PID_legL.Target += chassis->Target_Leg_l;
     Math_Constrain(&chassis->PID_legL.Target, MIN_LEG_LENGTH, MAX_LEG_LENGTH);
-    chassis->PID_legL.Now = vmcl->L0;
+    chassis->PID_legL.Now = chassis->left_leg.L0;
     PID_TIM_Adjust_PeriodElapsedCallback(&chassis->PID_legL);
 
     // 设置右腿长度目标
     chassis->PID_legR.Target += chassis->Target_Leg_r;
     Math_Constrain(&chassis->PID_legR.Target, MIN_LEG_LENGTH, MAX_LEG_LENGTH);
-    chassis->PID_legR.Now = vmcr->L0;
+    chassis->PID_legR.Now = chassis->right_leg.L0;
     PID_TIM_Adjust_PeriodElapsedCallback(&chassis->PID_legR);
 
     // 设置横滚目标
@@ -235,7 +294,7 @@ static void chassis_control_loop(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_l
  * @param
  * @return
  */
-static void chassis_lqr_calc_to_motor(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr)
+static void chassis_lqr_calc_to_motor(chassis_move_t *chassis)
 {
     for (int i = 0; i < 4; i++)
     {
@@ -252,18 +311,21 @@ static void chassis_lqr_calc_to_motor(chassis_move_t *chassis, vmc_leg_t *vmcl, 
     }
     chassis->T_wl = chassis->T[0];
     chassis->T_wr = chassis->T[1];
-    vmcl->Tp = chassis->T[2] - chassis->PID_tp_omega.Out;
-    vmcr->Tp = chassis->T[3] + chassis->PID_tp_omega.Out;
+    chassis->left_leg.Tp = chassis->T[2] - chassis->PID_tp_omega.Out;
+    chassis->right_leg.Tp = chassis->T[3] + chassis->PID_tp_omega.Out;
+    chassis->left_leg.F0 = chassis->PID_legL.Out - chassis->spring_force_l + chassis->M / arm_cos_f32(chassis->left_leg.theta) - chassis->F_mc + 5.0f;
+    chassis->right_leg.F0 = -chassis->PID_legR.Out + chassis->spring_force_r - chassis->M / arm_cos_f32(chassis->right_leg.theta) - chassis->F_mc - 0.0f;
+
     //通过leg_convert得到髋关节每个电机应有的力矩
-    VMC_Calc_2(vmcl);
-    VMC_Calc_2(vmcr);
+    VMC_Calc_2(&chassis->left_leg);
+    VMC_Calc_2(&chassis->right_leg);
 }
 /**
  * @brief 输出到电机
  * @param
  * @return
  */
-static void chassis_output_to_motor(chassis_move_t *chassis, vmc_leg_t *vmcl, vmc_leg_t *vmcr)
+static void chassis_output_to_motor(chassis_move_t *chassis)
 {
     static int mod = 0;
     mod++;
@@ -289,10 +351,10 @@ static void chassis_output_to_motor(chassis_move_t *chassis, vmc_leg_t *vmcl, vm
     // chassis->Motor_Joint[2].Control_Torque = -Host_communication.Rx_data.torque[2] * 1.0f;
     // chassis->Motor_Joint[1].Control_Torque = -Host_communication.Rx_data.torque[1] * 1.0f;
     // chassis->Motor_Joint[0].Control_Torque = -Host_communication.Rx_data.torque[0] * 1.0f;
-    chassis->Motor_Joint[3].Control_Torque = float_constrain(vmcr->torque_set[1] * 1.0f, -45.0f, 45.0f);
-    chassis->Motor_Joint[2].Control_Torque = float_constrain(vmcr->torque_set[0] * 1.0f, -45.0f, 45.0f);
-    chassis->Motor_Joint[1].Control_Torque = float_constrain(-vmcl->torque_set[1] * 1.0f, -45.0f, 45.0f);
-    chassis->Motor_Joint[0].Control_Torque = float_constrain(-vmcl->torque_set[0] * 1.0f, -45.0f, 45.0f);
+    chassis->Motor_Joint[3].Control_Torque = float_constrain(chassis->right_leg.torque_set[1] * 1.0f, -45.0f, 45.0f);
+    chassis->Motor_Joint[2].Control_Torque = float_constrain(chassis->right_leg.torque_set[0] * 1.0f, -45.0f, 45.0f);
+    chassis->Motor_Joint[1].Control_Torque = float_constrain(-chassis->left_leg.torque_set[1] * 1.0f, -45.0f, 45.0f);
+    chassis->Motor_Joint[0].Control_Torque = float_constrain(-chassis->left_leg.torque_set[0] * 1.0f, -45.0f, 45.0f);
 
     // chassis->Motor_Wheel[0].Target_Current = 4.0f * Host_communication.Rx_data.wheel_torque[0];
     // chassis->Motor_Wheel[1].Target_Current = 4.0f * Host_communication.Rx_data.wheel_torque[1];
