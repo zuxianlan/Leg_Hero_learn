@@ -94,6 +94,7 @@ typedef struct
     float Target_Velocity; //目标速度
     float Target_Omega; //目标偏航角速度
     float follow_yaw_angle;
+    float follow_yaw_offset; // 跟随航向角偏移
 
     float Omega_l;
     float Omega_r;

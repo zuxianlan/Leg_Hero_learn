@@ -119,6 +119,9 @@ static void chassis_init(chassis_move_t *chassis_move_init)
                     Motor_DJI_Power_Limit_Status_DISABLE, 20.0f);
     chassis_move_init->Motor_Wheel[1].Gearbox_Rate = 15.17f;
 
+    //¸úËæº½Ïò½ÇÆ«ÒÆ
+    chassis_move_init->follow_yaw_offset = 2.34;
+
     // µ×ÅÌ PID ³õÊ¼»¯
     PID_Init(&chassis_move_init->PID_legL, 50.0f, 10.0f, 20.0f, 0.0f, 10.0f, 150.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
     PID_Init(&chassis_move_init->PID_legR, 50.0f, 10.0f, 20.0f, 0.0f, 10.0f, 150.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
