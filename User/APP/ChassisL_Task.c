@@ -123,8 +123,8 @@ static void chassis_init(chassis_move_t *chassis_move_init)
     chassis_move_init->follow_yaw_offset = 2.34;
 
     // µ×ÅÌ PID ³õÊ¼»¯
-    PID_Init(&chassis_move_init->PID_legL, 50.0f, 10.0f, 20.0f, 0.0f, 10.0f, 150.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
-    PID_Init(&chassis_move_init->PID_legR, 50.0f, 10.0f, 20.0f, 0.0f, 10.0f, 150.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
+    PID_Init(&chassis_move_init->PID_legL, 50.0f, 1.0f, 2.0f, 0.0f, 10.0f, 150.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
+    PID_Init(&chassis_move_init->PID_legR, 50.0f, 0.0f, 2.0f, 0.0f, 10.0f, 150.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
     PID_Init(&chassis_move_init->PID_follow_yaw, 10.0f, 0.1f, 0.01f, 0.00f, 0.3f, 4.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_DISABLE);
     PID_Init(&chassis_move_init->PID_roll, 5.0f, 0.0f, 1.0f, 0.0f, 0.0f, 90.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
     PID_Init(&chassis_move_init->PID_tp, 70.0f, 0.0f, 0.0f, 0.0f, 0.0f, 5.0f, 0.01f, 0.0f, 0.0f, 0.0f,0.0f, PID_D_First_ENABLE);
@@ -390,21 +390,27 @@ static void chassis_output_to_motor(chassis_move_t *chassis)
         chassis->Super_Cap_Tx.cap_flag = 1;
     }
 
-    // chassis->Motor_Joint[3].Control_Torque = -Host_communication.Rx_data.torque[3] * 1.0f;
-    // chassis->Motor_Joint[2].Control_Torque = -Host_communication.Rx_data.torque[2] * 1.0f;
-    // chassis->Motor_Joint[1].Control_Torque = -Host_communication.Rx_data.torque[1] * 1.0f;
-    // chassis->Motor_Joint[0].Control_Torque = -Host_communication.Rx_data.torque[0] * 1.0f;
-    chassis->Motor_Joint[3].Control_Torque = float_constrain(chassis->right_leg.torque_set[1] * 1.0f, -45.0f, 45.0f);
-    chassis->Motor_Joint[2].Control_Torque = float_constrain(chassis->right_leg.torque_set[0] * 1.0f, -45.0f, 45.0f);
-    chassis->Motor_Joint[1].Control_Torque = float_constrain(-chassis->left_leg.torque_set[1] * 1.0f, -45.0f, 45.0f);
-    chassis->Motor_Joint[0].Control_Torque = float_constrain(-chassis->left_leg.torque_set[0] * 1.0f, -45.0f, 45.0f);
+    if (chassis_mode == CHASSIS_INFANTRY_FOLLOW_GIMBAL_YAW)
+    {
+        chassis->Motor_Joint[3].Control_Torque = float_constrain(chassis->right_leg.torque_set[1] * 1.0f, -45.0f, 45.0f);
+        chassis->Motor_Joint[2].Control_Torque = float_constrain(chassis->right_leg.torque_set[0] * 1.0f, -45.0f, 45.0f);
+        chassis->Motor_Joint[1].Control_Torque = float_constrain(-chassis->left_leg.torque_set[1] * 1.0f, -45.0f, 45.0f);
+        chassis->Motor_Joint[0].Control_Torque = float_constrain(-chassis->left_leg.torque_set[0] * 1.0f, -45.0f, 45.0f);
 
-    // chassis->Motor_Wheel[0].Target_Current = 4.0f * Host_communication.Rx_data.wheel_torque[0];
-    // chassis->Motor_Wheel[1].Target_Current = 4.0f * Host_communication.Rx_data.wheel_torque[1];
-    chassis->Motor_Wheel[0].Target_Current = float_constrain(4.0f * chassis->T_wl, -4.0f, 4.0f);
-    chassis->Motor_Wheel[1].Target_Current = float_constrain(4.0f * chassis->T_wr, -4.0f, 4.0f);
+        chassis->Motor_Wheel[0].Target_Current = float_constrain(4.0f * chassis->T_wl, -4.0f, 4.0f);
+        chassis->Motor_Wheel[1].Target_Current = float_constrain(4.0f * chassis->T_wr, -4.0f, 4.0f);
+    }
+    else if (chassis_mode == CHASSIS_CHECK_IN)
+    {
+        chassis->Motor_Joint[3].Control_Torque = 0.0f;
+        chassis->Motor_Joint[2].Control_Torque = 0.0f;
+        chassis->Motor_Joint[1].Control_Torque = 0.0f;
+        chassis->Motor_Joint[0].Control_Torque = 0.0f;
 
-    if (Can_Comm.Can_Control_Data.Rx_Data.robot_control_status==No_Control)
+        chassis->Motor_Wheel[0].Target_Current = float_constrain(4.0f * chassis->T_wl, -4.0f, 4.0f);
+        chassis->Motor_Wheel[1].Target_Current = float_constrain(4.0f * chassis->T_wr, -4.0f, 4.0f);
+    }
+    if (Can_Comm.Can_Control_Data.Rx_Data.robot_control_status==No_Control || chassis_mode == CHASSIS_ZERO_FORCE)
     {
         chassis->Motor_Joint[3].Control_Torque = 0.0f;
         chassis->Motor_Joint[2].Control_Torque = 0.0f;
