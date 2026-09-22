@@ -24,9 +24,10 @@
 #define MIN_LEG_LENGTH 0.15f
 #define MAX_LEG_LENGTH 0.28f
 #define RC_to_Chassis_Leg_Gain 0.0005f
-#define DR16_Rocker_Dead_Zone 0.04f
+#define DR16_Rocker_Dead_Zone 0.07f
 // 最大速度
-#define MAX_Velocity 1.0f
+#define MAX_Velocity_X 2.0f
+#define MAX_Velocity_Y 1.0f
 /* Enum ----------------------------------------------------------------------*/
 
 /* Struct --------------------------------------------------------------------*/
@@ -61,6 +62,7 @@ typedef struct
     const RC_ctrl_t *chassis_RC; //底盘使用的遥控器指针, the point to remote control
     const INS_t *chassis_INS_point;
     RC_ctrl_t Chassis_RC;
+    Slope_t Slope_Velocity_X; //斜坡函数
 
     cap_rx_data_t Super_Cap_Rx;
     cap_tx_data_t Super_Cap_Tx;
@@ -91,7 +93,8 @@ typedef struct
     float Target_Roll;
     float Target_Theta; //目标误差
     float Target_X; //目标位移
-    float Target_Velocity; //目标速度
+    float Target_Velocity_X; //目标速度
+    float Target_Velocity_Y;
     float Target_Omega; //目标偏航角速度
     float follow_yaw_angle;
     float follow_yaw_offset; // 跟随航向角偏移
