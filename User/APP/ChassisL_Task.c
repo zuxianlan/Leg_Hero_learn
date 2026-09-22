@@ -181,6 +181,26 @@ static void chassis_set_control(chassis_move_t *chassis)
         PID_Clear_Out(&chassis->PID_legR);
 
     }
+    else if (chassis_mode == CHASSIS_CHECK_IN)
+    {
+        float vx_channel = 0, vy_channel = 0, vz_channel = 0;
+        vx_channel = chassis->chassis_RC->RC.ch[3];
+        // 遥控器摇杆可能存在偏差，死区范围内的输入置零
+        vx_channel = Float_Math_Abs(vx_channel) > DR16_Rocker_Dead_Zone ? vx_channel : 0.0f;
+        // 设置速度
+        chassis_move.Target_Velocity = vx_channel * MAX_Velocity;
+        // 设置偏航角速度
+        chassis_move.Target_Omega = 0.0f;
+        // 设置偏航目标
+        //chassis_move.Target_Yaw = vy_channel;
+        // 设置横滚目标
+        chassis_move.Target_Roll = 0.0f;
+        // 设置 theta 误差目标
+        chassis_move.Target_Theta = 0.0f;
+
+        chassis_move.Target_Leg_l = vz_channel * RC_to_Chassis_Leg_Gain;
+        chassis_move.Target_Leg_r = vz_channel * RC_to_Chassis_Leg_Gain;
+    }
     else if (chassis_mode == CHASSIS_INFANTRY_FOLLOW_GIMBAL_YAW)
     {
         float vx_channel = 0, vy_channel = 0, vz_channel = 0;
@@ -205,8 +225,6 @@ static void chassis_set_control(chassis_move_t *chassis)
 
         chassis_move.Target_Leg_l = vz_channel * RC_to_Chassis_Leg_Gain;
         chassis_move.Target_Leg_r = vz_channel * RC_to_Chassis_Leg_Gain;
-
-
     }
 
 }
@@ -214,13 +232,13 @@ static void chassis_set_control(chassis_move_t *chassis)
 //反馈更新
 void Chassis_Feedback_Update(chassis_move_t *chassis)
 {
-    chassis->left_leg.phi1 = PI + chassis->Motor_Joint[1].Rx_Data.Now_Angle;
-    chassis->left_leg.phi4 = chassis->Motor_Joint[0].Rx_Data.Now_Angle;
+    chassis->left_leg.phi1 = normalizeAngleToPi_Robust(PI + chassis->Motor_Joint[1].Rx_Data.Now_Angle);
+    chassis->left_leg.phi4 = normalizeAngleToPi_Robust(chassis->Motor_Joint[0].Rx_Data.Now_Angle);
     chassis->left_leg.d_phi1 = chassis->Motor_Joint[1].Rx_Data.Now_Omega;
     chassis->left_leg.d_phi4 = chassis->Motor_Joint[0].Rx_Data.Now_Omega;
 
-    chassis->right_leg.phi1 = PI - chassis->Motor_Joint[2].Rx_Data.Now_Angle;
-    chassis->right_leg.phi4 = -chassis->Motor_Joint[3].Rx_Data.Now_Angle;
+    chassis->right_leg.phi1 = normalizeAngleToPi_Robust(PI - chassis->Motor_Joint[2].Rx_Data.Now_Angle);
+    chassis->right_leg.phi4 = normalizeAngleToPi_Robust(-chassis->Motor_Joint[3].Rx_Data.Now_Angle);
     chassis->right_leg.d_phi1 = -chassis->Motor_Joint[2].Rx_Data.Now_Omega;
     chassis->right_leg.d_phi4 = -chassis->Motor_Joint[3].Rx_Data.Now_Omega;
 
