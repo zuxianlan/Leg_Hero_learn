@@ -132,7 +132,7 @@ static void chassis_init(chassis_move_t *chassis_move_init)
     PID_Init(&chassis_move_init->PID_buffer, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f, 10.0f, 0.1f, 0.0f, 0.0f, 0.0f,0.0f, PID_D_First_DISABLE);
 
     //斜坡函数初始化
-    slope_init(&chassis_move_init->Slope_Velocity_X,1.0f / 5000.0f, 1.0f / 600.0f,Slope_First_REAL);
+    slope_init(&chassis_move_init->Slope_X,1.0f / 5000.0f, 1.0f / 600.0f,Slope_First_REAL);
 
     Motor_DM_Normal_CAN_Send_Enable(&chassis_move_init->Motor_Joint[0]);
     Motor_DM_Normal_CAN_Send_Enable(&chassis_move_init->Motor_Joint[1]);
@@ -271,7 +271,7 @@ void Chassis_Feedback_Update(chassis_move_t *chassis)
     chassis->spring_force_r = 100.0f - 10.0f*(1.0f - (chassis->right_leg.L0-0.1f)/0.28f);
 
     chassis->err[0] = chassis->X_filter - chassis->Target_X;
-    chassis->err[1] = chassis->Velocity_filter - chassis->Target_Velocity_X;
+    chassis->err[1] = chassis->Velocity_filter - chassis->Slope_Velocity_X;
     chassis->err[2] = 0;
     chassis->err[3] = chassis->chassis_INS_point->Gyro[2] - chassis->Target_Omega;
     chassis->err[4] = Max_Output((chassis->left_leg.theta - chassis->Target_Theta), 0.5f);
@@ -292,10 +292,10 @@ void Chassis_Feedback_Update(chassis_move_t *chassis)
 static void chassis_control_loop(chassis_move_t *chassis)
 {
     //设定速度
-    chassis->Slope_Velocity_X.Target = chassis->Target_Velocity_X;
-    chassis->Slope_Velocity_X.Now_Real = chassis->Velocity_filter;
-    slope_calc(&chassis->Slope_Velocity_X);
-    chassis->Target_Velocity_X = chassis->Slope_Velocity_X.Out;
+    chassis->Slope_X.Target = chassis->Target_Velocity_X;
+    chassis->Slope_X.Now_Real = chassis->Velocity_filter;
+    slope_calc(&chassis->Slope_X);
+    chassis->Slope_Velocity_X = chassis->Slope_X.Out;
 
     // 设置左腿长度目标
     chassis->PID_legL.Target += chassis->Target_Leg_l;
