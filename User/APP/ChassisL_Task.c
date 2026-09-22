@@ -120,11 +120,11 @@ static void chassis_init(chassis_move_t *chassis_move_init)
     chassis_move_init->Motor_Wheel[1].Gearbox_Rate = 15.17f;
 
     //¸úËæº½Ïò½ÇÆ«ÒÆ
-    chassis_move_init->follow_yaw_offset = 2.34;
+    chassis_move_init->follow_yaw_offset = 2.34f;
 
     // µ×ÅÌ PID ³õÊ¼»¯
-    PID_Init(&chassis_move_init->PID_legL, 50.0f, 1.0f, 2.0f, 0.0f, 10.0f, 150.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
-    PID_Init(&chassis_move_init->PID_legR, 50.0f, 0.0f, 2.0f, 0.0f, 10.0f, 150.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
+    PID_Init(&chassis_move_init->PID_legL, 50.0f, 1.0f, 2.0f, 0.0f, 30.0f, 150.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
+    PID_Init(&chassis_move_init->PID_legR, 50.0f, 1.0f, 2.0f, 0.0f, 30.0f, 150.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
     PID_Init(&chassis_move_init->PID_follow_yaw, 10.0f, 0.1f, 0.01f, 0.00f, 0.3f, 4.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_DISABLE);
     PID_Init(&chassis_move_init->PID_roll, 5.0f, 0.0f, 1.0f, 0.0f, 0.0f, 90.0f, 0.001f, 0.0f, 0.0f, 0.0f, 0.0f, PID_D_First_ENABLE);
     PID_Init(&chassis_move_init->PID_tp, 70.0f, 0.0f, 0.0f, 0.0f, 0.0f, 5.0f, 0.01f, 0.0f, 0.0f, 0.0f,0.0f, PID_D_First_ENABLE);
