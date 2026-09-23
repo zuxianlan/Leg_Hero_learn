@@ -38,10 +38,10 @@ void Host_Comm_Task()
     osDelay(2000);
     while (1)
     {
-        Host_Transmit(&Host_communication);
-        Host_Transmit_judge_error(&Host_communication);
-
-        error_time++;
+        // Host_Transmit(&Host_communication);
+        // Host_Transmit_judge_error(&Host_communication);
+        //
+        // error_time++;
 
         osDelay(1);
     }
@@ -90,8 +90,8 @@ static void Host_Transmit(Host_communication_t *data)
     tmp_buff->Motor_wheel[1].omega = chassis_move.Motor_Wheel[1].Rx_Data.Now_Omega;
 
     tmp_buff->yaw = INS.Yaw;
-    tmp_buff->roll = INS.Pitch - 0.017f;
-    tmp_buff->pitch = INS.Roll;
+    tmp_buff->roll = INS.Roll - 0.017f;
+    tmp_buff->pitch = INS.Pitch;
 
     // tmp_buff->current[0] = chassis_move.Motor_Wheel[0].Rx_Data.Now_Current;
     // tmp_buff->current[1] = chassis_move.Motor_Wheel[1].Rx_Data.Now_Current;

@@ -301,9 +301,13 @@ void INS_Task(void)
             BodyFrameToEarthFrame(INS.MotionAccel_b, INS.MotionAccel_n, INS.q); // ??????????n
 
             // ??????????
+            // INS.Yaw = QEKF_INS.Yaw * ANGLE_TO_RADIAN;
+            // INS.Roll = QEKF_INS.Pitch * ANGLE_TO_RADIAN;
+            // INS.Pitch = QEKF_INS.Roll * ANGLE_TO_RADIAN;
+            // INS.YawTotalAngle = QEKF_INS.YawTotalAngle * ANGLE_TO_RADIAN;
             INS.Yaw = QEKF_INS.Yaw * ANGLE_TO_RADIAN;
-            INS.Roll = QEKF_INS.Pitch * ANGLE_TO_RADIAN;
-            INS.Pitch = QEKF_INS.Roll * ANGLE_TO_RADIAN;
+            INS.Roll = QEKF_INS.Roll * ANGLE_TO_RADIAN;
+            INS.Pitch = QEKF_INS.Pitch * ANGLE_TO_RADIAN;
             INS.YawTotalAngle = QEKF_INS.YawTotalAngle * ANGLE_TO_RADIAN;
         }
 

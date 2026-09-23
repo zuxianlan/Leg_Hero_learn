@@ -35,8 +35,25 @@ void Other_Task(void)
 
 void UART_Send_feedback_update(float data[])
 {
-    //data[0] = chassis_move.chassis_INS_point->Roll;
-    data[1] = chassis_move.chassis_INS_point->Pitch;
+    data[0] = chassis_move.chassis_INS_point->Pitch;
+    data[1] = chassis_move.chassis_INS_point->Yaw;
+    data[2] = chassis_move.chassis_INS_point->Roll;
+    data[3] = chassis_move.chassis_INS_point->Gyro[0];
+    data[4] = chassis_move.chassis_INS_point->Gyro[2];
+
+    // data[0] = chassis_move.left_leg.phi1;
+    // data[1] = chassis_move.left_leg.phi4;
+    // data[2] = chassis_move.right_leg.phi1;
+    // data[3] = chassis_move.right_leg.phi4;
+    // data[4] = chassis_move.left_leg.d_phi1;
+    // data[5] = chassis_move.left_leg.d_phi4;
+    // data[6] = chassis_move.right_leg.d_phi1;
+    // data[7] = chassis_move.right_leg.d_phi4;
+
+    // data[0] = chassis_move.Motor_Wheel[0].Rx_Data.Now_Omega;
+    // data[1] = chassis_move.Motor_Wheel[1].Rx_Data.Now_Omega;
+
+
     VOFA_Transmit_JustFloat(data,15);
 }
 

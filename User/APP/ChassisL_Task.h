@@ -72,6 +72,7 @@ typedef struct
 
     float pitch;
     float d_pitch;
+    float roll;
 
     PID_control PID_buffer; // 左腿变腿长pid
     PID_control PID_legL; // 左腿变腿长pid

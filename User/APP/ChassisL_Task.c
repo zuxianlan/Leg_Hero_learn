@@ -238,21 +238,23 @@ static void chassis_set_control(chassis_move_t *chassis)
 //反馈更新
 void Chassis_Feedback_Update(chassis_move_t *chassis)
 {
-    chassis->left_leg.phi1 = normalizeAngleToPi_Robust(PI + chassis->Motor_Joint[1].Rx_Data.Now_Angle);
+    chassis->left_leg.phi1 = PI + normalizeAngleToPi_Robust(chassis->Motor_Joint[1].Rx_Data.Now_Angle);
     chassis->left_leg.phi4 = normalizeAngleToPi_Robust(chassis->Motor_Joint[0].Rx_Data.Now_Angle);
     chassis->left_leg.d_phi1 = chassis->Motor_Joint[1].Rx_Data.Now_Omega;
     chassis->left_leg.d_phi4 = chassis->Motor_Joint[0].Rx_Data.Now_Omega;
 
-    chassis->right_leg.phi1 = normalizeAngleToPi_Robust(PI - chassis->Motor_Joint[2].Rx_Data.Now_Angle);
-    chassis->right_leg.phi4 = normalizeAngleToPi_Robust(-chassis->Motor_Joint[3].Rx_Data.Now_Angle);
+    chassis->right_leg.phi1 = PI - normalizeAngleToPi_Robust(chassis->Motor_Joint[2].Rx_Data.Now_Angle);
+    chassis->right_leg.phi4 = -normalizeAngleToPi_Robust(chassis->Motor_Joint[3].Rx_Data.Now_Angle);
     chassis->right_leg.d_phi1 = -chassis->Motor_Joint[2].Rx_Data.Now_Omega;
     chassis->right_leg.d_phi4 = -chassis->Motor_Joint[3].Rx_Data.Now_Omega;
 
     VMC_Calc_1(&chassis->left_leg, (float)chassis_time/1000.0f);
     VMC_Calc_1(&chassis->right_leg, (float)chassis_time/1000.0f);
 
-    chassis->pitch = chassis->chassis_INS_point->Pitch;
-    chassis->d_pitch = chassis->chassis_INS_point->Gyro[0];
+    chassis->pitch = -chassis->chassis_INS_point->Pitch;
+    chassis->d_pitch = -chassis->chassis_INS_point->Gyro[0];
+    chassis->roll = -chassis->chassis_INS_point->Roll;
+
     chassis->theta_err = chassis->left_leg.theta - chassis->right_leg.theta;
     chassis->d_theta_err = chassis->left_leg.d_theta - chassis->right_leg.d_theta;
     chassis->Omega_l = chassis->Motor_Wheel[0].Rx_Data.Now_Omega - chassis->d_pitch + chassis->left_leg.d_theta;
@@ -427,6 +429,10 @@ static void chassis_output_to_motor(chassis_move_t *chassis)
     Motor_DM_Normal_TIM_Send_PeriodElapsedCallback(&chassis->Motor_Joint[3]);
     Motor_C620_TIM_Calculate_PeriodElapsedCallback(&chassis->Motor_Wheel[0]);
     Motor_C620_TIM_Calculate_PeriodElapsedCallback(&chassis->Motor_Wheel[1]);
+
+    // ★ 与香橙派一致：位置通道按拍归零（位置项不介入，只保留速度环）
+    chassis->X_filter = 0.0f;
+    chassis->Target_X = chassis->X_filter;
 }
 
 
